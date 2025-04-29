@@ -204,7 +204,7 @@ export default function BoundingBoxDrawer({
 
       {/* Output */}
       {boxCoordsList.length > 0 && (
-        <div className="mt-4 w-full max-w-lg bg-gray-100 p-4 rounded-md">
+        <div className="mt-4 w-full max-w-4xl bg-gray-100 rounded-md">
           <h3 className="font-medium text-lg">Bounding Box JSON Output:</h3>
           <pre className="bg-gray-200 p-4 rounded-md text-sm">
             {generateJsonOutput()}

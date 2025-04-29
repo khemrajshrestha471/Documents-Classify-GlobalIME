@@ -18,10 +18,7 @@ export default function DocumentUploader() {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Array of refs for each page/image
   const imageRefs = useRef<(HTMLImageElement | null)[]>([]);
-
-  // Coordinates for each image
   const [coordinatesList, setCoordinatesList] = useState<
     { top: number; left: number; bottom: number; right: number }[]
   >([]);
@@ -45,7 +42,7 @@ export default function DocumentUploader() {
         );
 
         if (supportedFiles.length === 0) {
-          setError("No supported files selected");
+          setError("No supported files selected. Please upload a valid document.");
           return;
         }
 
@@ -72,7 +69,7 @@ export default function DocumentUploader() {
         setUploadedFiles((prev) => [...prev, ...successfulFiles]);
 
         if (failedFiles.length > 0) {
-          setError(`Failed to process ${failedFiles.length} file(s)`);
+          setError(`Failed to process ${failedFiles.length} file(s).`);
         }
       } catch (err) {
         console.error("Error processing files:", err);
@@ -156,7 +153,6 @@ export default function DocumentUploader() {
   };
 
   useEffect(() => {
-    // Calculate coordinates once images are rendered
     const newCoordinates: {
       top: number;
       left: number;
@@ -167,10 +163,10 @@ export default function DocumentUploader() {
     imageRefs.current.forEach((img) => {
       if (img) {
         newCoordinates.push({
-          top: 0, // Always 0
-          left: 0, // Always 0
-          bottom: img.naturalHeight, // Real height of the image
-          right: img.naturalWidth, // Real width of the image
+          top: 0,
+          left: 0,
+          bottom: img.naturalHeight,
+          right: img.naturalWidth,
         });
       }
     });
@@ -179,94 +175,85 @@ export default function DocumentUploader() {
   }, [uploadedFiles]);
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-6">Document Upload</h1>
+    <div className="min-h-screen bg-gray-50 py-12">
+      <div className="">
+        <div className="bg-white p-8 rounded-lg shadow-md">
+          <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">Upload and View Your Documents</h1>
+          <p className="text-gray-600 text-center mb-8">
+            Easily upload PDFs or images and view them with bounding boxes. Supported formats: <b>PDF, JPG, JPEG, PNG</b>.
+          </p>
 
-      <div className="mb-6">
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileChange}
-          accept=".pdf,.jpg,.jpeg,.png"
-          multiple
-          className="hidden"
-        />
-        <button
-          onClick={triggerFileInput}
-          disabled={isConverting}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md disabled:opacity-50"
-        >
-          {isConverting ? "Processing..." : "Upload Documents"}
-        </button>
-        <p className="text-sm text-gray-500 mt-2">
-          Supported formats: PDF, JPG, JPEG, PNG
-        </p>
-      </div>
-
-      {error && (
-        <div className="mb-4 p-4 bg-red-50 rounded-md">
-          <p className="text-red-700">{error}</p>
-        </div>
-      )}
-
-      {isConverting && (
-        <div className="mb-4 p-4 bg-blue-50 rounded-md">
-          <p className="text-blue-700">Converting files... Please wait.</p>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {uploadedFiles.map((file, fileIndex) => (
-          <div 
-          key={`${file.name}-${fileIndex}`} 
-          className="border rounded-md p-4 relative">
+          <div className="flex justify-center mb-6">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept=".pdf,.jpg,.jpeg,.png"
+              multiple
+              className="hidden"
+            />
             <button
-              onClick={() => removeFile(fileIndex)}
-              className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center"
+              onClick={triggerFileInput}
+              disabled={isConverting}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg shadow-md transition disabled:opacity-50 cursor-pointer"
             >
-              ×
+              {isConverting ? "Processing..." : "Choose Documents"}
             </button>
-
-            <h3 className="font-medium truncate mb-2">{file.name}</h3>
-
-            <div>
-              {file.pages.map((page, pageIndex) => (
-                <div key={`${file.name}-page-${pageIndex}`} className="relative">
-                  <img
-                    key={`${file.name}-${pageIndex}`}
-                    src={page}
-                    alt={`Page ${pageIndex + 1} of ${file.name}`}
-                    ref={(el) => {
-                      imageRefs.current[fileIndex] = el;
-                    }}
-                    className="w-full border rounded-md mb-2"
-                    // className="w-auto h-auto max-w-none max-h-none"
-                  />
-
-                  <BoundingBoxDrawer
-                  key={`bounding-box-${file.name}-page-${pageIndex}`}
-                    imageUrl={page}
-                    naturalWidth={coordinatesList[fileIndex]?.right || 0}
-                    naturalHeight={coordinatesList[fileIndex]?.bottom || 0}
-                  />
-                </div>
-              ))}
-            </div>
-
-            {coordinatesList[fileIndex] && (
-              <div className="mt-2 text-xs text-gray-700 bg-green-100 p-2 rounded">
-                <p>
-                  <strong>Top-Left:</strong> (0, 0)
-                </p>
-                <p>
-                  <strong>Bottom-Right:</strong> (
-                  {coordinatesList[fileIndex].right.toFixed(2)},{" "}
-                  {coordinatesList[fileIndex].bottom.toFixed(2)})
-                </p>
-              </div>
-            )}
           </div>
-        ))}
+
+          {error && (
+            <div className="mb-6 p-4 bg-red-100 text-red-700 rounded-lg text-center font-semibold">
+              {error}
+            </div>
+          )}
+
+          {isConverting && (
+            <div className="mb-6 p-4 bg-blue-100 text-blue-700 rounded-lg text-center font-semibold">
+              Processing your documents, please wait...
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {uploadedFiles.map((file, fileIndex) => (
+              <div key={`${file.name}-${fileIndex}`} className="bg-gray-100 rounded-lg p-4 shadow-sm relative">
+                <button
+                  onClick={() => removeFile(fileIndex)}
+                  className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center"
+                >
+                  ×
+                </button>
+
+                <h3 className="font-semibold text-gray-700 text-sm truncate mb-3">{file.name}</h3>
+
+                {file.pages.map((page, pageIndex) => (
+                  <div key={`${file.name}-page-${pageIndex}`} className="relative">
+                    <img
+                      src={page}
+                      alt={`Page ${pageIndex + 1} of ${file.name}`}
+                      ref={(el) => {
+                        imageRefs.current[fileIndex] = el;
+                      }}
+                      className="w-full h-auto rounded-lg mb-2"
+                    />
+                    <BoundingBoxDrawer
+                      key={`bounding-box-${file.name}-page-${pageIndex}`}
+                      imageUrl={page}
+                      naturalWidth={coordinatesList[fileIndex]?.right || 0}
+                      naturalHeight={coordinatesList[fileIndex]?.bottom || 0}
+                    />
+                  </div>
+                ))}
+
+                {coordinatesList[fileIndex] && (
+                  <div className="mt-3 text-xs text-gray-700 bg-green-100 p-2 rounded">
+                    <p><strong>Top-Left:</strong> (0, 0)</p>
+                    <p><strong>Bottom-Right:</strong> ({coordinatesList[fileIndex].right.toFixed(2)}, {coordinatesList[fileIndex].bottom.toFixed(2)})</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
