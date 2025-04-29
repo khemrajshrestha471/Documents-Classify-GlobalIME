@@ -17,6 +17,14 @@ export default function DocumentUploader() {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Array of refs for each page/image
+  const imageRefs = useRef<(HTMLImageElement | null)[]>([]);
+
+  // Coordinates for each image
+  const [coordinatesList, setCoordinatesList] = useState<
+    { top: number; left: number; bottom: number; right: number }[]
+  >([]);
+
   const supportedTypes = [
     "application/pdf",
     "image/jpeg",
@@ -30,8 +38,8 @@ export default function DocumentUploader() {
       setIsConverting(true);
       try {
         const filesArray = Array.from(e.target.files);
-        
-        const supportedFiles = filesArray.filter(file => 
+
+        const supportedFiles = filesArray.filter((file) =>
           supportedTypes.includes(file.type)
         );
 
@@ -51,17 +59,17 @@ export default function DocumentUploader() {
                 type: file.type,
                 preview: "",
                 pages: [],
-                error: true
+                error: true,
               };
             }
           })
         );
 
-        const successfulFiles = convertedFiles.filter(f => !f.error);
-        const failedFiles = convertedFiles.filter(f => f.error);
+        const successfulFiles = convertedFiles.filter((f) => !f.error);
+        const failedFiles = convertedFiles.filter((f) => f.error);
 
-        setUploadedFiles(prev => [...prev, ...successfulFiles]);
-        
+        setUploadedFiles((prev) => [...prev, ...successfulFiles]);
+
         if (failedFiles.length > 0) {
           setError(`Failed to process ${failedFiles.length} file(s)`);
         }
@@ -86,30 +94,29 @@ export default function DocumentUploader() {
     try {
       const pdfjs = await getPdfjs();
       if (!pdfjs) throw new Error("PDF.js not available");
-      
+
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjs.getDocument(arrayBuffer).promise;
-      
+
       const pageImages: string[] = [];
-      
-      // Convert first page only for demo
+
       const page = await pdf.getPage(1);
       const viewport = page.getViewport({ scale: 1.5 });
-      
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
+
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
       if (!context) throw new Error("Could not get canvas context");
-      
+
       canvas.height = viewport.height;
       canvas.width = viewport.width;
-      
+
       await page.render({
         canvasContext: context,
-        viewport: viewport
+        viewport: viewport,
       }).promise;
-      
-      pageImages.push(canvas.toDataURL('image/png'));
-      
+
+      pageImages.push(canvas.toDataURL("image/png"));
+
       return {
         name: file.name,
         type: file.type,
@@ -139,33 +146,41 @@ export default function DocumentUploader() {
   };
 
   const removeFile = (index: number) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+    setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
+    setCoordinatesList((prev) => prev.filter((_, i) => i !== index));
   };
 
   const triggerFileInput = () => {
     fileInputRef.current?.click();
   };
 
-  // Clean up object URLs when component unmounts
   useEffect(() => {
-    return () => {
-      uploadedFiles.forEach(file => {
-        if (file.preview.startsWith('blob:')) {
-          URL.revokeObjectURL(file.preview);
-        }
-        file.pages.forEach(page => {
-          if (page.startsWith('blob:')) {
-            URL.revokeObjectURL(page);
-          }
+    // Calculate coordinates once images are rendered
+    const newCoordinates: {
+      top: number;
+      left: number;
+      bottom: number;
+      right: number;
+    }[] = [];
+
+    imageRefs.current.forEach((img) => {
+      if (img) {
+        newCoordinates.push({
+          top: 0, // Always 0
+          left: 0, // Always 0
+          bottom: img.naturalHeight, // Real height of the image
+          right: img.naturalWidth, // Real width of the image
         });
-      });
-    };
+      }
+    });
+
+    setCoordinatesList(newCoordinates);
   }, [uploadedFiles]);
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="p-4">
       <h1 className="text-2xl font-bold mb-6">Document Upload</h1>
-      
+
       <div className="mb-6">
         <input
           type="file"
@@ -200,30 +215,53 @@ export default function DocumentUploader() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {uploadedFiles.map((file, index) => (
-          <div key={index} className="border rounded-md p-4 relative">
+        {uploadedFiles.map((file, fileIndex) => (
+          <div key={fileIndex} className="border rounded-md p-4 relative">
             <button
-              onClick={() => removeFile(index)}
+              onClick={() => removeFile(fileIndex)}
               className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center"
             >
               ×
             </button>
-            
+
             <h3 className="font-medium truncate mb-2">{file.name}</h3>
-            
-            <div className="overflow-auto max-h-80">
+
+            <div>
               {file.pages.map((page, pageIndex) => (
                 <img
                   key={pageIndex}
                   src={page}
                   alt={`Page ${pageIndex + 1} of ${file.name}`}
+                  ref={(el) => {
+                    imageRefs.current[fileIndex] = el;
+                  }}
                   className="w-full border rounded-md mb-2"
+                //   className="w-auto h-auto max-w-none max-h-none"
                 />
               ))}
             </div>
+
+            {coordinatesList[fileIndex] && (
+              <div className="mt-2 text-xs text-gray-700 bg-green-100 p-2 rounded">
+                <p>
+                  <strong>Top-Left:</strong> (0, 0)
+                </p>
+                <p>
+                  <strong>Bottom-Right:</strong> (
+                  {coordinatesList[fileIndex].right.toFixed(2)},{" "}
+                  {coordinatesList[fileIndex].bottom.toFixed(2)})
+                </p>
+              </div>
+            )}
           </div>
         ))}
       </div>
     </div>
   );
 }
+
+// Top-Left: (0, 0)
+
+// Bottom-Right: (3058.00, 2183.00)
+
+// Bottom-Right: (918.00, 1188.00)
