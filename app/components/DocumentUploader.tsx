@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { getPdfjs } from "@/lib/pdfjsWrapper";
+import BoundingBoxDrawer from "@/app/components/BoundingBoxDrawer";
 
 interface UploadedFile {
   name: string;
@@ -216,7 +217,9 @@ export default function DocumentUploader() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {uploadedFiles.map((file, fileIndex) => (
-          <div key={fileIndex} className="border rounded-md p-4 relative">
+          <div 
+          key={`${file.name}-${fileIndex}`} 
+          className="border rounded-md p-4 relative">
             <button
               onClick={() => removeFile(fileIndex)}
               className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center"
@@ -228,16 +231,24 @@ export default function DocumentUploader() {
 
             <div>
               {file.pages.map((page, pageIndex) => (
-                <img
-                  key={pageIndex}
-                  src={page}
-                  alt={`Page ${pageIndex + 1} of ${file.name}`}
-                  ref={(el) => {
-                    imageRefs.current[fileIndex] = el;
-                  }}
-                  className="w-full border rounded-md mb-2"
-                //   className="w-auto h-auto max-w-none max-h-none"
-                />
+                <>
+                  <img
+                    key={`${file.name}-${pageIndex}`}
+                    src={page}
+                    alt={`Page ${pageIndex + 1} of ${file.name}`}
+                    ref={(el) => {
+                      imageRefs.current[fileIndex] = el;
+                    }}
+                    className="w-full border rounded-md mb-2"
+                    // className="w-auto h-auto max-w-none max-h-none"
+                  />
+
+                  <BoundingBoxDrawer
+                    imageUrl={page}
+                    naturalWidth={coordinatesList[fileIndex]?.right || 0}
+                    naturalHeight={coordinatesList[fileIndex]?.bottom || 0}
+                  />
+                </>
               ))}
             </div>
 
@@ -259,9 +270,3 @@ export default function DocumentUploader() {
     </div>
   );
 }
-
-// Top-Left: (0, 0)
-
-// Bottom-Right: (3058.00, 2183.00)
-
-// Bottom-Right: (918.00, 1188.00)
