@@ -81,6 +81,18 @@ export default function BoundingBoxDrawer({
 
   const handleKeyNameSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && currentKeyName.trim()) {
+      const trimmedKey = currentKeyName.trim().toLowerCase(); // make it lowercase for comparison
+
+    // Check if the lowercase version of key name already exists
+    const isDuplicate = boxCoordsList.some(
+      (box) => box.keyName.trim().toLowerCase() === trimmedKey
+    );
+
+    if (isDuplicate) {
+      alert("Warning: Key name already exists (case-insensitive). Please enter a unique key.");
+      return; // Stop without adding
+    }
+
       setBoxCoordsList((prev) => {
         const updatedList = [...prev];
         updatedList[updatedList.length - 1].keyName = currentKeyName;
