@@ -84,15 +84,17 @@ export default function BoundingBoxDrawer({
     if (e.key === "Enter" && currentKeyName.trim()) {
       const trimmedKey = currentKeyName.trim().toLowerCase(); // make it lowercase for comparison
 
-    // Check if the lowercase version of key name already exists
-    const isDuplicate = boxCoordsList.some(
-      (box) => box.keyName.trim().toLowerCase() === trimmedKey
-    );
+      // Check if the lowercase version of key name already exists
+      const isDuplicate = boxCoordsList.some(
+        (box) => box.keyName.trim().toLowerCase() === trimmedKey
+      );
 
-    if (isDuplicate) {
-      alert("Warning: Key name already exists (case-insensitive). Please enter a unique key.");
-      return; // Stop without adding
-    }
+      if (isDuplicate) {
+        alert(
+          "Warning: Key name already exists (case-insensitive). Please enter a unique key."
+        );
+        return; // Stop without adding
+      }
 
       setBoxCoordsList((prev) => {
         const updatedList = [...prev];
@@ -163,7 +165,7 @@ export default function BoundingBoxDrawer({
         {/* Render all saved boxes */}
         {boxCoordsList.map((box, index) => (
           <div
-          key={box.id}
+            key={box.id}
             className="absolute border-2 border-green-500"
             style={{
               left: `${(box.topLeft.x / naturalWidth) * 100}%`,
@@ -202,13 +204,20 @@ export default function BoundingBoxDrawer({
         </div>
       )}
 
-      {/* Output */}
       {boxCoordsList.length > 0 && (
-        <div className="mt-4 w-full max-w-4xl bg-gray-100 rounded-md">
-          <h3 className="font-medium text-lg">Bounding Box JSON Output:</h3>
-          <pre className="bg-gray-200 p-4 rounded-md text-sm">
+        <div className="mt-4 w-full max-w-4xl bg-gray-100 rounded-md p-4">
+          <h3 className="font-medium text-lg mb-2">
+            Bounding Box JSON Output:
+          </h3>
+          <pre className="bg-gray-200 p-4 rounded-md text-sm whitespace-pre-wrap">
             {generateJsonOutput()}
           </pre>
+          <button
+            onClick={() => alert(generateJsonOutput())}
+            className="mt-4 bg-[#C5161D] hover:bg-[#a91318] text-white px-4 py-2 rounded transition cursor-pointer"
+          >
+            Submit
+          </button>
         </div>
       )}
     </div>
