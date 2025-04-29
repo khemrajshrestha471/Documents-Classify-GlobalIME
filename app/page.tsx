@@ -1,12 +1,9 @@
-import { Button } from "@/components/ui/button"
+import DocumentUploader from "@/app/components/DocumentUploader";
 
 export default function Home() {
   return (
-    <>
-    <h1 className="text-3xl font-bold underline">
-      Hello world!
-    </h1>
-    <Button>Click me</Button>
-    </>
+    <main className="min-h-screen p-8">
+      <DocumentUploader />
+    </main>
   );
 }
