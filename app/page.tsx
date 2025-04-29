@@ -1,32 +1,3 @@
-// 'use client';
-
-// import { Button } from "@/components/ui/button";
-// import { useRouter } from "next/navigation";
-
-// export default function LandingPage() {
-//   const router = useRouter();
-
-//   return (
-//     <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-blue-50 to-blue-100 p-4">
-//       <div className="text-center space-y-6">
-//         <h1 className="text-4xl font-bold text-blue-900">Document Classification Portal</h1>
-//         <p className="text-lg text-blue-700 max-w-xl mx-auto">
-//           Seamlessly classify documents like Citizenship, Passport, PAN Card, and more. Extract important information securely and efficiently.
-//         </p>
-//         <Button
-//           className="px-6 py-3 text-lg"
-//           onClick={() => router.push('/login')}
-//         >
-//           Login
-//         </Button>
-//       </div>
-//     </main>
-//   );
-// }
-
-
-
-
 'use client';
 
 import { Button } from "@/components/ui/button";
