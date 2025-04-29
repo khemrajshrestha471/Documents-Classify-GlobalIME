@@ -23,6 +23,7 @@ export default function BoundingBoxDrawer({
 
   const [boxCoordsList, setBoxCoordsList] = useState<
     {
+      id: number;
       topLeft: { x: number; y: number };
       bottomRight: { x: number; y: number };
       keyName: string;
@@ -65,7 +66,7 @@ export default function BoundingBoxDrawer({
 
       setBoxCoordsList((prev) => [
         ...prev,
-        { topLeft, bottomRight, keyName: "" }, // temp empty keyName
+        { id: Date.now() + Math.random(), topLeft, bottomRight, keyName: "" }, // temp empty keyName
       ]);
       setCurrentKeyName("");
       setIsPrompting(true); // prompt after drawing
@@ -162,7 +163,7 @@ export default function BoundingBoxDrawer({
         {/* Render all saved boxes */}
         {boxCoordsList.map((box, index) => (
           <div
-            key={index}
+          key={box.id}
             className="absolute border-2 border-green-500"
             style={{
               left: `${(box.topLeft.x / naturalWidth) * 100}%`,

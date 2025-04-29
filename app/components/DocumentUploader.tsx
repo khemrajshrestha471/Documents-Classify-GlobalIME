@@ -231,7 +231,7 @@ export default function DocumentUploader() {
 
             <div>
               {file.pages.map((page, pageIndex) => (
-                <>
+                <div key={`${file.name}-page-${pageIndex}`} className="relative">
                   <img
                     key={`${file.name}-${pageIndex}`}
                     src={page}
@@ -244,11 +244,12 @@ export default function DocumentUploader() {
                   />
 
                   <BoundingBoxDrawer
+                  key={`bounding-box-${file.name}-page-${pageIndex}`}
                     imageUrl={page}
                     naturalWidth={coordinatesList[fileIndex]?.right || 0}
                     naturalHeight={coordinatesList[fileIndex]?.bottom || 0}
                   />
-                </>
+                </div>
               ))}
             </div>
 
