@@ -26,6 +26,7 @@ interface BoundingBoxDrawerProps {
   } | null;
 }
 
+
 export default function BoundingBoxDrawer({
   imageUrl,
   naturalWidth,

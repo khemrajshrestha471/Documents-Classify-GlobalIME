@@ -59,30 +59,43 @@ export default function DocumentUploader() {
     return canvas.toDataURL("image/png");
   };
 
+
   const classifyAndGetCoordinates = async (file: File) => {
     try {
       setIsConverting(true);
       setError(null);
-      
-      // Step 1: Classify the image
+  
+      // Step 1: Upload image to backend and get bounding box coordinates
       const formData = new FormData();
       formData.append("file", file);
-      
+
       const classifyResponse = await fetch("http://localhost:8080/api/classify-image", {
         method: "POST",
         body: formData,
       });
-      
+
       if (!classifyResponse.ok) throw new Error("Classification failed");
       const classificationResult = await classifyResponse.json();
-      
-      // Step 2: Get coordinates based on classification
-      const coordinatesResponse = await fetch(
-        `http://localhost:8000/api/coordinates?class=${classificationResult.predicted_class}`
-      );
-      if (!coordinatesResponse.ok) throw new Error('Failed to fetch coordinates');
-      const { coordinates } = await coordinatesResponse.json();
-      
+  
+      const coordinatesResponse = await fetch("http://localhost:8000/api/coordinates", {
+        method: "POST",
+        body: formData,
+      });
+  
+      if (!coordinatesResponse.ok) throw new Error("Failed to fetch coordinates");
+  
+      const { coordinates } = await coordinatesResponse.json(); // This is now an array
+  
+      // You can render boxes using these coordinates
+      coordinates.forEach((coordStr:any) => {
+        const [start, end] = coordStr.split("), ");
+        const [x1, y1] = start.replace("(", "").split(",").map(Number);
+        const [x2, y2] = end.replace(")", "").split(",").map(Number);
+  
+        // You can use x1, y1, x2, y2 to draw the rectangle on the image
+        console.log(`Top-left: (${x1}, ${y1}), Bottom-right: (${x2}, ${y2})`);
+      });
+  
       return { classificationResult, coordinates };
     } catch (err) {
       console.error("Processing error:", err);
@@ -92,14 +105,24 @@ export default function DocumentUploader() {
     }
   };
 
+
+
+
   useEffect(() => {
     if (uploadedFiles.length === 0) return;
-
+  
     const loadCurrentFile = async () => {
       try {
         const currentFile = uploadedFiles[currentFileIndex];
+  
+        // If everything is already processed, don't reprocess
+        if (currentFile.imageUrl && currentFile.coordinates) {
+          setCurrentImageUrl(currentFile.imageUrl);
+          return;
+        }
+  
         let imageUrl: string;
-
+  
         if (currentFile.type === "application/pdf") {
           imageUrl = await convertPdfToImage(currentFile.file);
         } else {
@@ -109,31 +132,29 @@ export default function DocumentUploader() {
             reader.readAsDataURL(currentFile.file);
           });
         }
-
-        // Process the file if not already processed
-        if (!currentFile.classificationResult || !currentFile.coordinates) {
-          const { classificationResult, coordinates } = await classifyAndGetCoordinates(currentFile.file);
-          
-          setUploadedFiles(prev => prev.map((file, index) => 
-            index === currentFileIndex ? { 
-              ...file, 
-              imageUrl,
-              classificationResult,
-              coordinates 
-            } : file
-          ));
-          
-          setCurrentImageUrl(imageUrl);
-        } else {
-          setCurrentImageUrl(currentFile.imageUrl || "");
-        }
-
-        // Get natural dimensions
+  
+        
+        const { classificationResult, coordinates } = await classifyAndGetCoordinates(currentFile.file);
+  
+        setUploadedFiles((prev) =>
+          prev.map((file, index) =>
+            index === currentFileIndex
+              ? {
+                  ...file,
+                  imageUrl,
+                  classificationResult,
+                  coordinates,
+                }
+              : file
+          )
+        );
+        setCurrentImageUrl(imageUrl);
+  
         const img = new Image();
         img.onload = () => {
           setImageDimensions({
             width: img.naturalWidth,
-            height: img.naturalHeight
+            height: img.naturalHeight,
           });
         };
         img.src = imageUrl;
@@ -142,9 +163,10 @@ export default function DocumentUploader() {
         setError(`Failed to process ${uploadedFiles[currentFileIndex].name}`);
       }
     };
-
+  
     loadCurrentFile();
-  }, [currentFileIndex, uploadedFiles]);
+  }, [currentFileIndex]);
+  
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
