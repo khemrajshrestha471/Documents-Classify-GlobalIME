@@ -1,6 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState, useRef, useEffect } from "react";
+
+interface BoundingBox {
+  id: number;
+  topLeft: { x: number; y: number };
+  bottomRight: { x: number; y: number };
+  keyName: string;
+}
 
 interface BoundingBoxDrawerProps {
   imageUrl: string;
@@ -14,112 +21,48 @@ export default function BoundingBoxDrawer({
   naturalHeight,
 }: BoundingBoxDrawerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(
-    null
-  );
-  const [endPoint, setEndPoint] = useState<{ x: number; y: number } | null>(
-    null
-  );
+  const [boxCoordsList, setBoxCoordsList] = useState<BoundingBox[]>([]);
 
-  const [boxCoordsList, setBoxCoordsList] = useState<
-    {
-      id: number;
-      topLeft: { x: number; y: number };
-      bottomRight: { x: number; y: number };
-      keyName: string;
-    }[]
-  >([]);
-  const [currentKeyName, setCurrentKeyName] = useState<string>("");
-  const [isPrompting, setIsPrompting] = useState<boolean>(false);
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (isPrompting) return; // Prevent drawing while inputting key
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    const x = ((e.clientX - rect.left) / rect.width) * naturalWidth;
-    const y = ((e.clientY - rect.top) / rect.height) * naturalHeight;
-    setStartPoint({ x, y });
-    setEndPoint(null);
+  // Hardcoded coordinates from backend response
+  const predefinedCoordinates = {
+    "Name": "(523.86, 228.77), (625.78, 273.59)",
+    "Gender": "(877.52, 224.69), (1017.15, 265.44)",
+    "Ward": "(915.23, 292.94), (1022.24, 337.76)"
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!startPoint || isPrompting) return;
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    const x = ((e.clientX - rect.left) / rect.width) * naturalWidth;
-    const y = ((e.clientY - rect.top) / rect.height) * naturalHeight;
-    setEndPoint({ x, y });
+  // Parse coordinate string into {x, y} objects
+  const parseCoordinates = (coordString: string) => {
+    const coords = coordString.match(/[\d.]+/g)?.map(Number) || [];
+    return {
+      topLeft: { x: coords[0], y: coords[1] },
+      bottomRight: { x: coords[2], y: coords[3] }
+    };
   };
 
-  const handleMouseUp = () => {
-    if (startPoint && endPoint) {
-      const topLeft = {
-        x: Math.min(startPoint.x, endPoint.x),
-        y: Math.min(startPoint.y, endPoint.y),
-      };
-      const bottomRight = {
-        x: Math.max(startPoint.x, endPoint.x),
-        y: Math.max(startPoint.y, endPoint.y),
-      };
-
-      setBoxCoordsList((prev) => [
-        ...prev,
-        { id: Date.now() + Math.random(), topLeft, bottomRight, keyName: "" }, // temp empty keyName
-      ]);
-      setCurrentKeyName("");
-      setIsPrompting(true); // prompt after drawing
-
-      setStartPoint(null);
-      setEndPoint(null);
-    }
-  };
-
-  const handleKeyNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCurrentKeyName(e.target.value);
-  };
-
-  const handleKeyNameSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && currentKeyName.trim()) {
-      const trimmedKey = currentKeyName.trim().toLowerCase(); // make it lowercase for comparison
-
-      // Check if the lowercase version of key name already exists
-      const isDuplicate = boxCoordsList.some(
-        (box) => box.keyName.trim().toLowerCase() === trimmedKey
-      );
-
-      if (isDuplicate) {
-        alert(
-          "Warning: Key name already exists (case-insensitive). Please enter a unique key."
-        );
-        return; // Stop without adding
+  // Initialize boxes from predefined coordinates
+  useEffect(() => {
+    const boxes: BoundingBox[] = Object.entries(predefinedCoordinates).map(
+      ([keyName, coords], index) => {
+        const parsed = parseCoordinates(coords);
+        return {
+          id: index + 1,
+          keyName,
+          topLeft: parsed.topLeft,
+          bottomRight: parsed.bottomRight
+        };
       }
+    );
+    setBoxCoordsList(boxes);
+  }, []);
 
-      setBoxCoordsList((prev) => {
-        const updatedList = [...prev];
-        updatedList[updatedList.length - 1].keyName = currentKeyName;
-        return updatedList;
-      });
-      setCurrentKeyName("");
-      setIsPrompting(false);
-    }
-  };
-
-  const handleDeleteBox = (indexToDelete: number) => {
-    setBoxCoordsList((prev) => prev.filter((_, i) => i !== indexToDelete));
+  const handleDeleteBox = (id: number) => {
+    setBoxCoordsList(prev => prev.filter(box => box.id !== id));
   };
 
   const generateJsonOutput = () => {
     const output: Record<string, string> = {};
     boxCoordsList.forEach((box) => {
-      if (box.keyName.trim()) {
-        output[box.keyName] = `(${box.topLeft.x.toFixed(
-          2
-        )}, ${box.topLeft.y.toFixed(2)}), (${box.bottomRight.x.toFixed(
-          2
-        )}, ${box.bottomRight.y.toFixed(2)})`;
-      }
+      output[box.keyName] = `(${box.topLeft.x.toFixed(2)}, ${box.topLeft.y.toFixed(2)}), (${box.bottomRight.x.toFixed(2)}, ${box.bottomRight.y.toFixed(2)})`;
     });
     return JSON.stringify(output, null, 2);
   };
@@ -128,11 +71,7 @@ export default function BoundingBoxDrawer({
     <div className="flex flex-col items-center gap-4">
       <div
         ref={containerRef}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
         className="relative inline-block border"
-        style={{ touchAction: "none" }}
       >
         <img
           src={imageUrl}
@@ -141,82 +80,43 @@ export default function BoundingBoxDrawer({
           draggable={false}
         />
 
-        {/* Live drawing box */}
-        {startPoint && endPoint && (
-          <div
-            className="absolute border-2 border-red-500"
-            style={{
-              left: `${
-                (Math.min(startPoint.x, endPoint.x) / naturalWidth) * 100
-              }%`,
-              top: `${
-                (Math.min(startPoint.y, endPoint.y) / naturalHeight) * 100
-              }%`,
-              width: `${
-                (Math.abs(startPoint.x - endPoint.x) / naturalWidth) * 100
-              }%`,
-              height: `${
-                (Math.abs(startPoint.y - endPoint.y) / naturalHeight) * 100
-              }%`,
-            }}
-          />
-        )}
-
-        {/* Render all saved boxes */}
-        {boxCoordsList.map((box, index) => (
+        {/* Render all boxes from coordinates */}
+        {boxCoordsList.map((box) => (
           <div
             key={box.id}
-            className="absolute border-2 border-green-500"
+            className="absolute border-2 border-blue-500 bg-blue-500/10"
             style={{
               left: `${(box.topLeft.x / naturalWidth) * 100}%`,
               top: `${(box.topLeft.y / naturalHeight) * 100}%`,
-              width: `${
-                ((box.bottomRight.x - box.topLeft.x) / naturalWidth) * 100
-              }%`,
-              height: `${
-                ((box.bottomRight.y - box.topLeft.y) / naturalHeight) * 100
-              }%`,
+              width: `${((box.bottomRight.x - box.topLeft.x) / naturalWidth) * 100}%`,
+              height: `${((box.bottomRight.y - box.topLeft.y) / naturalHeight) * 100}%`,
             }}
           >
+            <div className="absolute -top-5 left-0 bg-blue-500 text-white text-xs px-1 rounded-t">
+              {box.keyName}
+            </div>
             <button
-              onClick={() => handleDeleteBox(index)}
-              className="absolute top-[-6px] right-[-6px] bg-red-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] leading-none"
+              onClick={() => handleDeleteBox(box.id)}
+              className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs leading-none"
               title="Delete"
             >
-              ✕
+              ×
             </button>
           </div>
         ))}
       </div>
 
-      {/* Input for key name */}
-      {isPrompting && (
-        <div className="flex flex-col items-center gap-4 mt-4">
-          <input
-            type="text"
-            value={currentKeyName}
-            onChange={handleKeyNameChange}
-            onKeyDown={handleKeyNameSubmit}
-            className="border p-2 rounded-md"
-            placeholder="Enter key name"
-          />
-          <p className="text-sm text-gray-500">Press Enter to save key name</p>
-        </div>
-      )}
-
       {boxCoordsList.length > 0 && (
         <div className="mt-4 w-full max-w-4xl bg-gray-100 rounded-md p-4">
-          <h3 className="font-medium text-lg mb-2">
-            Bounding Box JSON Output:
-          </h3>
+          <h3 className="font-medium text-lg mb-2">Bounding Box Coordinates:</h3>
           <pre className="bg-gray-200 p-4 rounded-md text-sm whitespace-pre-wrap">
             {generateJsonOutput()}
           </pre>
           <button
-            onClick={() => alert(generateJsonOutput())}
+            onClick={() => console.log(generateJsonOutput())}
             className="mt-4 bg-[#C5161D] hover:bg-[#a91318] text-white px-4 py-2 rounded transition cursor-pointer"
           >
-            Submit
+            Submit to Backend
           </button>
         </div>
       )}
