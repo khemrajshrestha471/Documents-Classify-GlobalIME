@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { getPdfjs } from "@/lib/pdfjsWrapper";
 import BoundingBoxDrawer from "@/app/components/BoundingBoxDrawer";
+import { Button } from "@/components/ui/button";
 
 interface LineData {
   text: string;
@@ -92,8 +93,9 @@ export default function DocumentUploader() {
         }
       );
 
-      if (!coordinatesResponse.ok) throw new Error("Failed to fetch coordinates");
-      
+      if (!coordinatesResponse.ok)
+        throw new Error("Failed to fetch coordinates");
+
       const responseData = await coordinatesResponse.json();
       const lineData = responseData.lines || []; // Ensure we get the lines array
 
@@ -234,7 +236,7 @@ export default function DocumentUploader() {
             <button
               onClick={triggerFileInput}
               disabled={isConverting}
-              className="bg-[#C5161D] hover:bg-[#a91318] text-white font-semibold px-6 py-3 rounded-lg shadow-md transition disabled:opacity-50"
+              className="bg-[#C5161D] hover:bg-[#a91318] text-white font-semibold px-6 py-3 rounded-lg shadow-md transition disabled:opacity-50 cursor-pointer"
             >
               Upload Documents
             </button>
@@ -273,7 +275,8 @@ export default function DocumentUploader() {
                         naturalWidth={imageDimensions.width}
                         naturalHeight={imageDimensions.height}
                         lineData={{
-                          lines: uploadedFiles[currentFileIndex]?.lineData || []
+                          lines:
+                            uploadedFiles[currentFileIndex]?.lineData || [],
                         }}
                         classificationResult={
                           uploadedFiles[currentFileIndex]?.classificationResult
@@ -307,6 +310,11 @@ export default function DocumentUploader() {
           )}
         </div>
       </div>
+      {uploadedFiles.length > 0 && (
+        <Button onClick={() => alert("Submitted to database")} className="bg-[#C5161D] hover:bg-[#a91318] text-white font-semibold px-6 py-3 rounded-lg shadow-md transition disabled:opacity-50 cursor-pointer my-3 float-right">
+          Submit
+        </Button>
+      )}
     </div>
   );
 }

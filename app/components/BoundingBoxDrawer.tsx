@@ -45,6 +45,7 @@ export default function BoundingBoxDrawer({
   const containerRef = useRef<HTMLDivElement>(null);
   const [boxes, setBoxes] = useState<BoundingBox[]>([]);
   const [selectedBox, setSelectedBox] = useState<BoundingBox | null>(null);
+  const [editableData, setEditableData] = useState<any[]>([]);
 
   useEffect(() => {
     if (lineData?.lines) {
@@ -66,22 +67,34 @@ export default function BoundingBoxDrawer({
         .filter(Boolean) as BoundingBox[];
 
       setBoxes(parsedBoxes);
+      setEditableData(
+        parsedBoxes.map((box, index) => ({
+          index,
+          text: box.text,
+          confidence: box.confidence,
+          coordinates: `(${box.topLeft.x.toFixed(2)}, ${box.topLeft.y.toFixed(2)}), (${box.bottomRight.x.toFixed(2)}, ${box.bottomRight.y.toFixed(2)})`,
+        }))
+      );
     } else {
       setBoxes([]);
+      setEditableData([]);
     }
   }, [lineData]);
 
   const handleDeleteBox = (id: number) => {
     setBoxes((prev) => prev.filter((box) => box.id !== id));
+    setEditableData((prev) =>
+      prev.filter((_, index) => boxes.findIndex((b) => b.id === id) !== index)
+    );
   };
 
-  const generateJsonOutput = () => {
-    return boxes.map((box, index) => ({
-      index,
-      text: box.text,
-      confidence: box.confidence,
-      coordinates: `(${box.topLeft.x}, ${box.topLeft.y}), (${box.bottomRight.x}, ${box.bottomRight.y})`
-    }));
+  const handleTextChange = (index: number, newText: string) => {
+    setEditableData((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, text: newText } : item))
+    );
+    setBoxes((prev) =>
+      prev.map((box, i) => (i === index ? { ...box, text: newText } : box))
+    );
   };
 
   const getConfidenceColor = (confidence: number) => {
@@ -108,19 +121,19 @@ export default function BoundingBoxDrawer({
 
             return (
               <Rnd
-                key={box.id}
-                size={{
-                  width: (width / naturalWidth) * 100 + "%",
-                  height: (height / naturalHeight) * 100 + "%",
-                }}
-                position={{
-                  x:
-                    (box.topLeft.x / naturalWidth) *
-                    (containerRef.current?.offsetWidth || 0),
-                  y:
-                    (box.topLeft.y / naturalHeight) *
-                    (containerRef.current?.offsetHeight || 0),
-                }}
+  key={box.id}
+  size={{
+    width: (width / naturalWidth) * (containerRef.current?.offsetWidth || 0),
+    height: (height / naturalHeight) * (containerRef.current?.offsetHeight || 0),
+  }}
+  position={{
+    x:
+      (box.topLeft.x / naturalWidth) *
+      (containerRef.current?.offsetWidth || 0),
+    y:
+      (box.topLeft.y / naturalHeight) *
+      (containerRef.current?.offsetHeight || 0),
+  }}
                 onDragStop={(e, d) => {
                   const containerW = containerRef.current?.offsetWidth || 1;
                   const containerH = containerRef.current?.offsetHeight || 1;
@@ -141,6 +154,16 @@ export default function BoundingBoxDrawer({
                             bottomRight: newBottomRight,
                           }
                         : b
+                    )
+                  );
+                  setEditableData((prev) =>
+                    prev.map((item, i) =>
+                      i === index
+                        ? {
+                            ...item,
+                            coordinates: `(${newTopLeft.x.toFixed(2)}, ${newTopLeft.y.toFixed(2)}), (${newBottomRight.x.toFixed(2)}, ${newBottomRight.y.toFixed(2)})`,
+                          }
+                        : item
                     )
                   );
                 }}
@@ -173,12 +196,23 @@ export default function BoundingBoxDrawer({
                         : b
                     )
                   );
+                  setEditableData((prev) =>
+                    prev.map((item, i) =>
+                      i === index
+                        ? {
+                            ...item,
+                            coordinates: `(${newTopLeft.x.toFixed(2)}, ${newTopLeft.y.toFixed(2)}), (${newBottomRight.x.toFixed(2)}, ${newBottomRight.y.toFixed(2)})`,
+                          }
+                        : item
+                    )
+                  );
                 }}
                 bounds="parent"
                 style={{
                   border: "2px solid #3B82F6",
                   backgroundColor: "rgba(59, 130, 246, 0.1)",
                   position: "absolute",
+                  overflow: "visible", // Ensure children can extend outside
                 }}
                 onClick={() => setSelectedBox(box)}
               >
@@ -188,15 +222,16 @@ export default function BoundingBoxDrawer({
                   {index} ({(box.confidence * 100).toFixed(1)}%)
                 </div>
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteBox(box.id);
-                  }}
-                  className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs leading-none"
-                  title="Delete"
-                >
-                  ×
-                </button>
+  onClick={(e) => {
+    e.stopPropagation();
+    handleDeleteBox(box.id);
+  }}
+  className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs leading-none z-50 pointer-events-auto"
+  style={{ zIndex: 10 }}
+  title="Delete"
+>
+  ×
+</button>
               </Rnd>
             );
           })}
@@ -220,12 +255,12 @@ export default function BoundingBoxDrawer({
         {classificationResult && (
           <div className="mt-2 text-lg">
             <p>
-              <strong>Document Class:</strong>{" "}
+              <strong>Predicted Class:</strong>{" "}
               {classificationResult.predicted_class}
             </p>
             <p>
               <strong>Confidence:</strong>{" "}
-              {(classificationResult.confidence * 100)}%
+              {(classificationResult.confidence * 100).toFixed(1)}%
             </p>
           </div>
         )}
@@ -233,9 +268,31 @@ export default function BoundingBoxDrawer({
         {boxes.length > 0 && (
           <div className="mt-4 w-full max-w-4xl bg-gray-100 rounded-md p-4">
             <h3 className="font-medium text-lg mb-2">Extracted Text Data:</h3>
-            <pre className="bg-gray-200 p-4 rounded-md text-sm whitespace-pre-wrap max-h-96 overflow-y-auto">
-              {JSON.stringify(generateJsonOutput(), null, 2)}
-            </pre>
+            <div className="bg-gray-200 p-4 rounded-md text-sm max-h-96 overflow-y-auto">
+              {editableData.map((item, index) => (
+                <div key={index} className="mb-4 p-2 bg-white rounded">
+                  <div className="font-semibold">Index: {item.index}</div>
+                  <div className="mt-1 flex items-center gap-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Text:
+                    </label>
+                    <input
+                      type="text"
+                      value={item.text}
+                      onChange={(e) => handleTextChange(index, e.target.value)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                    />
+                  </div>
+                  <div className="mt-1">
+                    Confidence: {item.confidence.toFixed(4)}
+                  </div>
+                  <div className="mt-1">Coordinates: {item.coordinates}</div>
+                </div>
+              ))}
+              <pre className="mt-4 p-2 bg-gray-100 rounded text-xs">
+                {JSON.stringify(editableData, null, 2)}
+              </pre>
+            </div>
           </div>
         )}
       </div>
