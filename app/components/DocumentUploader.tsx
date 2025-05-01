@@ -7,7 +7,13 @@ import BoundingBoxDrawer from "@/app/components/BoundingBoxDrawer";
 interface UploadedFile {
   name: string;
   type: string;
-  file: File; // Store File object instead of preview
+  file: File;
+  imageUrl?: string;
+  classificationResult?: {
+    predicted_class: string;
+    confidence: number;
+  };
+  coordinates?: Record<string, string>;
 }
 
 export default function DocumentUploader() {
@@ -29,7 +35,6 @@ export default function DocumentUploader() {
     "image/jpg",
   ];
 
-  // Convert PDF to image (only when needed)
   const convertPdfToImage = async (file: File): Promise<string> => {
     const pdfjs = await getPdfjs();
     if (!pdfjs) throw new Error("PDF.js not available");
@@ -54,12 +59,43 @@ export default function DocumentUploader() {
     return canvas.toDataURL("image/png");
   };
 
-  // Load current file when index changes
+  const classifyAndGetCoordinates = async (file: File) => {
+    try {
+      setIsConverting(true);
+      setError(null);
+      
+      // Step 1: Classify the image
+      const formData = new FormData();
+      formData.append("file", file);
+      
+      const classifyResponse = await fetch("http://localhost:8080/api/classify-image", {
+        method: "POST",
+        body: formData,
+      });
+      
+      if (!classifyResponse.ok) throw new Error("Classification failed");
+      const classificationResult = await classifyResponse.json();
+      
+      // Step 2: Get coordinates based on classification
+      const coordinatesResponse = await fetch(
+        `http://localhost:8000/api/coordinates?class=${classificationResult.predicted_class}`
+      );
+      if (!coordinatesResponse.ok) throw new Error('Failed to fetch coordinates');
+      const { coordinates } = await coordinatesResponse.json();
+      
+      return { classificationResult, coordinates };
+    } catch (err) {
+      console.error("Processing error:", err);
+      throw err;
+    } finally {
+      setIsConverting(false);
+    }
+  };
+
   useEffect(() => {
     if (uploadedFiles.length === 0) return;
 
     const loadCurrentFile = async () => {
-      setIsConverting(true);
       try {
         const currentFile = uploadedFiles[currentFileIndex];
         let imageUrl: string;
@@ -74,8 +110,24 @@ export default function DocumentUploader() {
           });
         }
 
-        setCurrentImageUrl(imageUrl);
-        
+        // Process the file if not already processed
+        if (!currentFile.classificationResult || !currentFile.coordinates) {
+          const { classificationResult, coordinates } = await classifyAndGetCoordinates(currentFile.file);
+          
+          setUploadedFiles(prev => prev.map((file, index) => 
+            index === currentFileIndex ? { 
+              ...file, 
+              imageUrl,
+              classificationResult,
+              coordinates 
+            } : file
+          ));
+          
+          setCurrentImageUrl(imageUrl);
+        } else {
+          setCurrentImageUrl(currentFile.imageUrl || "");
+        }
+
         // Get natural dimensions
         const img = new Image();
         img.onload = () => {
@@ -87,9 +139,7 @@ export default function DocumentUploader() {
         img.src = imageUrl;
       } catch (err) {
         console.error("Error loading file:", err);
-        setError(`Failed to load ${uploadedFiles[currentFileIndex].name}`);
-      } finally {
-        setIsConverting(false);
+        setError(`Failed to process ${uploadedFiles[currentFileIndex].name}`);
       }
     };
 
@@ -114,7 +164,7 @@ export default function DocumentUploader() {
         type: file.type,
         file: file
       })));
-      setCurrentFileIndex(0); // Reset to first file
+      setCurrentFileIndex(0);
     }
   };
 
@@ -152,7 +202,6 @@ export default function DocumentUploader() {
             Document Annotation Tool
           </h1>
 
-          {/* File upload button */}
           <div className="flex justify-center mb-6">
             <input
               type="file"
@@ -171,18 +220,15 @@ export default function DocumentUploader() {
             </button>
           </div>
 
-          {/* Error messages */}
           {error && (
             <div className="mb-6 p-4 bg-red-100 text-red-700 rounded-lg text-center">
               {error}
             </div>
           )}
 
-          {/* File display area */}
           {uploadedFiles.length > 0 && (
             <div className="relative">
               <div className="bg-[#FFF5F5] border border-[#C5161D]/40 rounded-lg p-4 shadow relative min-h-[500px] flex flex-col items-center justify-center">
-                {/* Current file name and delete button */}
                 <div className="w-full flex justify-between items-center mb-3">
                   <h3 className="font-semibold text-[#004189] text-sm truncate">
                     {uploadedFiles[currentFileIndex].name}
@@ -195,25 +241,24 @@ export default function DocumentUploader() {
                   </button>
                 </div>
 
-                {/* Loading state */}
                 {isConverting ? (
                   <div className="text-center py-10">
-                    <p>Loading file...</p>
+                    <p>Processing file...</p>
                   </div>
                 ) : (
-                  /* Bounding box drawer */
                   currentImageUrl && (
                     <div className="relative w-full h-full flex justify-center items-center">
                       <BoundingBoxDrawer
                         imageUrl={currentImageUrl}
                         naturalWidth={imageDimensions.width}
                         naturalHeight={imageDimensions.height}
+                        coordinates={uploadedFiles[currentFileIndex].coordinates}
+                        classificationResult={uploadedFiles[currentFileIndex].classificationResult}
                       />
                     </div>
                   )
                 )}
 
-                {/* Navigation controls */}
                 <div className="flex justify-between w-full mt-4">
                   <button
                     onClick={goToPrevFile}

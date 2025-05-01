@@ -1,11 +1,17 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { Rnd } from "react-rnd";
+
+interface Point {
+  x: number;
+  y: number;
+}
 
 interface BoundingBox {
   id: number;
-  topLeft: { x: number; y: number };
-  bottomRight: { x: number; y: number };
+  topLeft: Point;
+  bottomRight: Point;
   keyName: string;
 }
 
@@ -13,91 +19,53 @@ interface BoundingBoxDrawerProps {
   imageUrl: string;
   naturalWidth: number;
   naturalHeight: number;
+  coordinates?: Record<string, string>;
+  classificationResult?: {
+    predicted_class: string;
+    confidence: number;
+  } | null;
 }
-
-// Type for API response
-type ApiCoordinates = Record<string, string>;
 
 export default function BoundingBoxDrawer({
   imageUrl,
   naturalWidth,
   naturalHeight,
+  coordinates,
+  classificationResult
 }: BoundingBoxDrawerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [boxCoordsList, setBoxCoordsList] = useState<BoundingBox[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  // Parse coordinate string into {x, y} objects
-  const parseCoordinates = (coordString: string) => {
-    const coords = coordString.match(/[\d.]+/g)?.map(Number) || [];
-    if (coords.length !== 4) {
-      throw new Error(`Invalid coordinate format: ${coordString}`);
-    }
-    return {
-      topLeft: { x: coords[0], y: coords[1] },
-      bottomRight: { x: coords[2], y: coords[3] }
-    };
-  };
-
-// In your BoundingBoxDrawer component
-
-useEffect(() => {
-  const fetchCoordinates = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      const response = await fetch('http://localhost:8000/api/coordinates');
-      if (!response.ok) throw new Error('Failed to fetch coordinates');
-      
-      const data = await response.json();
-      const boxes: BoundingBox[] = Object.entries(data.coordinates).map(
-        ([keyName, coords], index) => {
-          const parsed = parseCoordinates(coords as string);
+  useEffect(() => {
+    if (coordinates) {
+      const boxes: BoundingBox[] = Object.entries(coordinates)
+        .map(([keyName, coordString], index) => {
+          const coords = coordString.match(/[\d.]+/g)?.map(Number) || [];
+          if (coords.length !== 4) {
+            console.error(`Invalid coordinate format: ${coordString}`);
+            return null;
+          }
           return {
             id: index + 1,
             keyName,
-            topLeft: parsed.topLeft,
-            bottomRight: parsed.bottomRight
+            topLeft: { x: coords[0], y: coords[1] },
+            bottomRight: { x: coords[2], y: coords[3] }
           };
-        }
-      );
+        })
+        .filter(Boolean) as BoundingBox[];
+      
       setBoxCoordsList(boxes);
-    } catch (err) {
-      console.error("Failed to load coordinates:", err);
-      setError(err instanceof Error ? err.message : "Failed to load coordinates");
-    } finally {
-      setIsLoading(false);
+    } else {
+      setBoxCoordsList([]);
     }
-  };
-
-  fetchCoordinates();
-}, []);
-
-// Update the submit handler
-const handleSubmit = async () => {
-  try {
-    const response = await fetch('http://localhost:8000/api/save-annotations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ coordinates: generateJsonOutput() })
-    });
-    
-    if (!response.ok) throw new Error('Submission failed');
-    alert("Coordinates submitted successfully!");
-  } catch (err) {
-    console.error("Submission failed:", err);
-    alert("Failed to submit coordinates");
-  }
-};
+  }, [coordinates]);
 
   const handleDeleteBox = (id: number) => {
     setBoxCoordsList(prev => prev.filter(box => box.id !== id));
   };
 
-  const generateJsonOutput = (): ApiCoordinates => {
-    const output: ApiCoordinates = {};
+  const generateJsonOutput = () => {
+    const output: Record<string, string> = {};
     boxCoordsList.forEach((box) => {
       output[box.keyName] = `(${box.topLeft.x.toFixed(2)}, ${box.topLeft.y.toFixed(2)}), (${box.bottomRight.x.toFixed(2)}, ${box.bottomRight.y.toFixed(2)})`;
     });
@@ -106,36 +74,73 @@ const handleSubmit = async () => {
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <div
-        ref={containerRef}
-        className="relative inline-block border"
-      >
-        <img
-          src={imageUrl}
-          alt="Uploaded"
-          className="max-w-full h-auto"
-          draggable={false}
+      <div ref={containerRef} className="relative inline-block border">
+        <img 
+          src={imageUrl} 
+          alt="Uploaded" 
+          className="max-w-full h-auto" 
+          draggable={false} 
         />
 
-        {isLoading ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/50">
-            <p>Loading coordinates...</p>
-          </div>
-        ) : error ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-red-100/50">
-            <p className="text-red-600">{error}</p>
-          </div>
-        ) : (
-          /* Render all boxes from coordinates */
-          boxCoordsList.map((box) => (
-            <div
+        {boxCoordsList.map((box) => {
+          const width = box.bottomRight.x - box.topLeft.x;
+          const height = box.bottomRight.y - box.topLeft.y;
+
+          return (
+            <Rnd
               key={box.id}
-              className="absolute border-2 border-blue-500 bg-blue-500/10"
+              size={{
+                width: (width / naturalWidth) * 100 + '%',
+                height: (height / naturalHeight) * 100 + '%'
+              }}
+              position={{
+                x: (box.topLeft.x / naturalWidth) * (containerRef.current?.offsetWidth || 0),
+                y: (box.topLeft.y / naturalHeight) * (containerRef.current?.offsetHeight || 0)
+              }}
+              onDragStop={(e, d) => {
+                const containerW = containerRef.current?.offsetWidth || 1;
+                const containerH = containerRef.current?.offsetHeight || 1;
+                const newTopLeft = {
+                  x: (d.x / containerW) * naturalWidth,
+                  y: (d.y / containerH) * naturalHeight
+                };
+                const newBottomRight = {
+                  x: newTopLeft.x + width,
+                  y: newTopLeft.y + height
+                };
+                setBoxCoordsList(prev =>
+                  prev.map(b =>
+                    b.id === box.id ? { ...b, topLeft: newTopLeft, bottomRight: newBottomRight } : b
+                  )
+                );
+              }}
+              onResizeStop={(e, direction, ref, delta, position) => {
+                const containerW = containerRef.current?.offsetWidth || 1;
+                const containerH = containerRef.current?.offsetHeight || 1;
+
+                const newWidth = (ref.offsetWidth / containerW) * naturalWidth;
+                const newHeight = (ref.offsetHeight / containerH) * naturalHeight;
+
+                const newTopLeft = {
+                  x: (position.x / containerW) * naturalWidth,
+                  y: (position.y / containerH) * naturalHeight
+                };
+                const newBottomRight = {
+                  x: newTopLeft.x + newWidth,
+                  y: newTopLeft.y + newHeight
+                };
+
+                setBoxCoordsList(prev =>
+                  prev.map(b =>
+                    b.id === box.id ? { ...b, topLeft: newTopLeft, bottomRight: newBottomRight } : b
+                  )
+                );
+              }}
+              bounds="parent"
               style={{
-                left: `${(box.topLeft.x / naturalWidth) * 100}%`,
-                top: `${(box.topLeft.y / naturalHeight) * 100}%`,
-                width: `${((box.bottomRight.x - box.topLeft.x) / naturalWidth) * 100}%`,
-                height: `${((box.bottomRight.y - box.topLeft.y) / naturalHeight) * 100}%`,
+                border: '2px solid #3B82F6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                position: 'absolute',
               }}
             >
               <div className="absolute -top-5 left-0 bg-blue-500 text-white text-xs px-1 rounded-t">
@@ -148,37 +153,24 @@ const handleSubmit = async () => {
               >
                 ×
               </button>
-            </div>
-          ))
-        )}
+            </Rnd>
+          );
+        })}
       </div>
 
-      {!isLoading && !error && boxCoordsList.length > 0 && (
+      {classificationResult && (
+        <div className="mt-2 text-lg">
+          <p><strong>Predicted Class:</strong> {classificationResult.predicted_class}</p>
+          <p><strong>Confidence:</strong> {classificationResult.confidence.toFixed(2)}</p>
+        </div>
+      )}
+
+      {boxCoordsList.length > 0 && (
         <div className="mt-4 w-full max-w-4xl bg-gray-100 rounded-md p-4">
           <h3 className="font-medium text-lg mb-2">Bounding Box Coordinates:</h3>
           <pre className="bg-gray-200 p-4 rounded-md text-sm whitespace-pre-wrap">
             {JSON.stringify(generateJsonOutput(), null, 2)}
           </pre>
-          <button
-            onClick={async () => {
-              try {
-                // Replace with actual API call
-                console.log("Submitting:", generateJsonOutput());
-                await fetch('/api/save-annotations', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(generateJsonOutput())
-                });
-                alert("Coordinates submitted successfully!");
-              } catch (err) {
-                console.error("Submission failed:", err);
-                alert("Failed to submit coordinates");
-              }
-            }}
-            className="mt-4 bg-[#C5161D] hover:bg-[#a91318] text-white px-4 py-2 rounded transition cursor-pointer"
-          >
-            Submit to Backend
-          </button>
         </div>
       )}
     </div>
