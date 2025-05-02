@@ -267,7 +267,7 @@ export default function BoundingBoxDrawer({
 
         {boxes.length > 0 && (
           <div className="mt-4 w-full max-w-4xl bg-gray-100 rounded-md p-4">
-            <h3 className="font-medium text-lg mb-2">Extracted Text Data:</h3>
+            <h3 className="font-medium text-lg mb-2 text-center">Extracted Text Data:</h3>
             <div className="bg-gray-200 p-4 rounded-md text-sm max-h-96 overflow-y-auto">
               {editableData.map((item, index) => (
                 <div key={index} className="mb-4 p-2 bg-white rounded">
@@ -289,9 +289,9 @@ export default function BoundingBoxDrawer({
                   <div className="mt-1">Coordinates: {item.coordinates}</div>
                 </div>
               ))}
-              <pre className="mt-4 p-2 bg-gray-100 rounded text-xs">
+              {/* <pre className="mt-4 p-2 bg-gray-100 rounded text-xs">
                 {JSON.stringify(editableData, null, 2)}
-              </pre>
+              </pre> */}
             </div>
           </div>
         )}

@@ -221,7 +221,7 @@ export default function DocumentUploader() {
       <div className="max-w-9xl mx-auto">
         <div className="bg-white p-8 rounded-lg shadow-lg border border-[#C5161D]">
           <h1 className="text-3xl font-bold text-[#004189] mb-6 text-center">
-            Document Annotation Tool
+            Document Classification Tool
           </h1>
 
           <div className="flex justify-center mb-6">
