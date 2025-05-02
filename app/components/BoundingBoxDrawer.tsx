@@ -11,7 +11,7 @@ interface Point {
 interface BoundingBox {
   id: number;
   text: string;
-  confidence: number;
+  confidence?: number; // Made optional
   topLeft: Point;
   bottomRight: Point;
 }
@@ -46,6 +46,9 @@ export default function BoundingBoxDrawer({
   const [boxes, setBoxes] = useState<BoundingBox[]>([]);
   const [selectedBox, setSelectedBox] = useState<BoundingBox | null>(null);
   const [editableData, setEditableData] = useState<any[]>([]);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [startPoint, setStartPoint] = useState<Point | null>(null);
+  const [currentBox, setCurrentBox] = useState<Point | null>(null);
 
   useEffect(() => {
     if (lineData?.lines) {
@@ -103,10 +106,90 @@ export default function BoundingBoxDrawer({
     return "bg-red-500";
   };
 
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.target !== containerRef.current?.firstChild) return;
+    
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const x = ((e.clientX - rect.left) / rect.width) * naturalWidth;
+    const y = ((e.clientY - rect.top) / rect.height) * naturalHeight;
+
+    setIsDrawing(true);
+    setStartPoint({ x, y });
+    setCurrentBox({ x, y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDrawing || !startPoint) return;
+
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const x = ((e.clientX - rect.left) / rect.width) * naturalWidth;
+    const y = ((e.clientY - rect.top) / rect.height) * naturalHeight;
+
+    setCurrentBox({ x, y });
+  };
+
+  const handleMouseUp = () => {
+    if (!isDrawing || !startPoint || !currentBox) return;
+
+    const minSize = 10;
+    const width = Math.abs(currentBox.x - startPoint.x);
+    const height = Math.abs(currentBox.y - startPoint.y);
+
+    if (width < minSize || height < minSize) {
+      setIsDrawing(false);
+      setStartPoint(null);
+      setCurrentBox(null);
+      return;
+    }
+
+    const topLeft = {
+      x: Math.min(startPoint.x, currentBox.x),
+      y: Math.min(startPoint.y, currentBox.y),
+    };
+    const bottomRight = {
+      x: Math.max(startPoint.x, currentBox.x),
+      y: Math.max(startPoint.y, currentBox.y),
+    };
+
+    const newBox: BoundingBox = {
+      id: boxes.length > 0 ? Math.max(...boxes.map(b => b.id)) + 1 : 1,
+      text: "New Text",
+      // No confidence score for manual boxes
+      topLeft,
+      bottomRight,
+    };
+
+    setBoxes((prev) => [...prev, newBox]);
+    setEditableData((prev) => [
+      ...prev,
+      {
+        index: boxes.length,
+        text: "New Text",
+        // No confidence for manual boxes
+        coordinates: `(${topLeft.x.toFixed(2)}, ${topLeft.y.toFixed(2)}), (${bottomRight.x.toFixed(2)}, ${bottomRight.y.toFixed(2)})`,
+      },
+    ]);
+
+    setIsDrawing(false);
+    setStartPoint(null);
+    setCurrentBox(null);
+  };
+
   return (
     <div className="flex flex-row items-center gap-4">
       <div>
-        <div ref={containerRef} className="relative inline-block border">
+        <div 
+          ref={containerRef} 
+          className="relative inline-block border"
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        >
           <img
             src={imageUrl}
             alt="Uploaded"
@@ -114,26 +197,34 @@ export default function BoundingBoxDrawer({
             draggable={false}
           />
 
+          {isDrawing && startPoint && currentBox && (
+            <div
+              className="absolute border-2 border-dashed border-blue-500 bg-blue-100 bg-opacity-20"
+              style={{
+                left: `${(Math.min(startPoint.x, currentBox.x) / naturalWidth) * 100}%`,
+                top: `${(Math.min(startPoint.y, currentBox.y) / naturalHeight) * 100}%`,
+                width: `${(Math.abs(currentBox.x - startPoint.x) / naturalWidth) * 100}%`,
+                height: `${(Math.abs(currentBox.y - startPoint.y) / naturalHeight) * 100}%`,
+              }}
+            />
+          )}
+
           {boxes.map((box, index) => {
             const width = box.bottomRight.x - box.topLeft.x;
             const height = box.bottomRight.y - box.topLeft.y;
-            const confidenceColor = getConfidenceColor(box.confidence);
+            const confidenceColor = box.confidence ? getConfidenceColor(box.confidence) : 'bg-gray-500';
 
             return (
               <Rnd
-  key={box.id}
-  size={{
-    width: (width / naturalWidth) * (containerRef.current?.offsetWidth || 0),
-    height: (height / naturalHeight) * (containerRef.current?.offsetHeight || 0),
-  }}
-  position={{
-    x:
-      (box.topLeft.x / naturalWidth) *
-      (containerRef.current?.offsetWidth || 0),
-    y:
-      (box.topLeft.y / naturalHeight) *
-      (containerRef.current?.offsetHeight || 0),
-  }}
+                key={box.id}
+                size={{
+                  width: (width / naturalWidth) * (containerRef.current?.offsetWidth || 0),
+                  height: (height / naturalHeight) * (containerRef.current?.offsetHeight || 0),
+                }}
+                position={{
+                  x: (box.topLeft.x / naturalWidth) * (containerRef.current?.offsetWidth || 0),
+                  y: (box.topLeft.y / naturalHeight) * (containerRef.current?.offsetHeight || 0),
+                }}
                 onDragStop={(e, d) => {
                   const containerW = containerRef.current?.offsetWidth || 1;
                   const containerH = containerRef.current?.offsetHeight || 1;
@@ -171,10 +262,8 @@ export default function BoundingBoxDrawer({
                   const containerW = containerRef.current?.offsetWidth || 1;
                   const containerH = containerRef.current?.offsetHeight || 1;
 
-                  const newWidth =
-                    (ref.offsetWidth / containerW) * naturalWidth;
-                  const newHeight =
-                    (ref.offsetHeight / containerH) * naturalHeight;
+                  const newWidth = (ref.offsetWidth / containerW) * naturalWidth;
+                  const newHeight = (ref.offsetHeight / containerH) * naturalHeight;
 
                   const newTopLeft = {
                     x: (position.x / containerW) * naturalWidth,
@@ -212,26 +301,26 @@ export default function BoundingBoxDrawer({
                   border: "2px solid #3B82F6",
                   backgroundColor: "rgba(59, 130, 246, 0.1)",
                   position: "absolute",
-                  overflow: "visible", // Ensure children can extend outside
+                  overflow: "visible",
                 }}
                 onClick={() => setSelectedBox(box)}
               >
                 <div
                   className={`absolute -top-5 left-0 ${confidenceColor} text-white text-xs px-1 rounded-t`}
                 >
-                  {index} ({(box.confidence * 100).toFixed(1)}%)
+                  {index} {box.confidence && `(${(box.confidence * 100).toFixed(1)}%)`}
                 </div>
                 <button
-  onClick={(e) => {
-    e.stopPropagation();
-    handleDeleteBox(box.id);
-  }}
-  className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs leading-none z-50 pointer-events-auto"
-  style={{ zIndex: 10 }}
-  title="Delete"
->
-  ×
-</button>
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteBox(box.id);
+                  }}
+                  className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs leading-none z-50 pointer-events-auto"
+                  style={{ zIndex: 10 }}
+                  title="Delete"
+                >
+                  ×
+                </button>
               </Rnd>
             );
           })}
@@ -241,9 +330,11 @@ export default function BoundingBoxDrawer({
           <div className="mt-2 p-4 bg-blue-50 rounded-lg w-full max-w-2xl">
             <h3 className="font-bold text-blue-800">Selected Text:</h3>
             <p className="text-lg">{selectedBox.text}</p>
-            <p className="text-sm">
-              Confidence: {(selectedBox.confidence * 100).toFixed(1)}%
-            </p>
+            {selectedBox.confidence && (
+              <p className="text-sm">
+                Confidence: {(selectedBox.confidence * 100).toFixed(1)}%
+              </p>
+            )}
             <p className="text-sm">
               Index: {boxes.findIndex((box) => box.id === selectedBox.id)}
             </p>
@@ -283,15 +374,14 @@ export default function BoundingBoxDrawer({
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     />
                   </div>
-                  <div className="mt-1">
-                    Confidence: {item.confidence.toFixed(4)}
-                  </div>
+                  {item.confidence && (
+                    <div className="mt-1">
+                      Confidence: {item.confidence.toFixed(4)}
+                    </div>
+                  )}
                   <div className="mt-1">Coordinates: {item.coordinates}</div>
                 </div>
               ))}
-              {/* <pre className="mt-4 p-2 bg-gray-100 rounded text-xs">
-                {JSON.stringify(editableData, null, 2)}
-              </pre> */}
             </div>
           </div>
         )}
