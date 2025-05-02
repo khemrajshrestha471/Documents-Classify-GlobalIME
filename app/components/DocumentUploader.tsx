@@ -34,6 +34,7 @@ export default function DocumentUploader() {
     width: 0,
     height: 0,
   });
+  const [kvData, setKvData] = useState<any>(null);
 
   const supportedTypes = [
     "application/pdf",
@@ -97,6 +98,8 @@ export default function DocumentUploader() {
         throw new Error("Failed to fetch coordinates");
 
       const responseData = await coordinatesResponse.json();
+      console.log("Coordinates response:", responseData.key_value_pairs);
+      setKvData(responseData.key_value_pairs); // Store the key-value pairs
       const lineData = responseData.lines || []; // Ensure we get the lines array
 
       return { classificationResult, lineData };
@@ -308,6 +311,17 @@ export default function DocumentUploader() {
               </div>
             </div>
           )}
+          {/* <pre>
+          {kvData && (
+            <p>{JSON.stringify(kvData)}</p>
+          )}
+          </pre> */}
+          {kvData && (
+  <pre className="bg-gray-100 p-4 rounded text-sm text-left overflow-auto">
+    {JSON.stringify(kvData, null, 2)}
+  </pre>
+)}
+
         </div>
       </div>
       {uploadedFiles.length > 0 && (
